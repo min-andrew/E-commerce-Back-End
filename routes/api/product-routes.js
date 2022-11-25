@@ -7,12 +7,36 @@ const { Product, Category, Tag, ProductTag } = require('../../models');
 router.get('/', (req, res) => {
   // find all products
   // be sure to include its associated Category and Tag data
+  try {
+    const productdata = await Product.findAll({
+      include: [{ model: Category }, { model: Tag }]
+    });
+    res.status(200).json(productdata);
+  } catch (error) {
+    res.status(504).json(error);
+  }
 });
 
 // get one product
 router.get('/:id', (req, res) => {
   // find a single product by its `id`
   // be sure to include its associated Category and Tag data
+  try {
+    const productdata = await Product.findOne({
+      where: {
+        id: req.params.id,
+      },
+      include: [{ model: Category }, { model: Tag }]
+    });
+
+    if (!productdata) {
+      res.status(404).json({ message: 'No product with this ID!' })
+    }
+
+    res.status(200).json(productdata);
+  } catch (err) {
+    res.status(500).json(err);
+  }
 });
 
 // create new product
@@ -42,7 +66,6 @@ router.post('/', (req, res) => {
     })
     .then((productTagIds) => res.status(200).json(productTagIds))
     .catch((err) => {
-      console.log(err);
       res.status(400).json(err);
     });
 });
@@ -57,7 +80,11 @@ router.put('/:id', (req, res) => {
   })
     .then((product) => {
       // find all associated tags from ProductTag
-      return ProductTag.findAll({ where: { product_id: req.params.id } });
+      return ProductTag.findAll({
+        where: {
+          product_id: req.params.id
+        }
+      });
     })
     .then((productTags) => {
       // get list of current tag_ids
@@ -72,25 +99,38 @@ router.put('/:id', (req, res) => {
           };
         });
       // figure out which ones to remove
-      const productTagsToRemove = productTags
+      const removedProductTags = productTags
         .filter(({ tag_id }) => !req.body.tagIds.includes(tag_id))
         .map(({ id }) => id);
 
       // run both actions
       return Promise.all([
-        ProductTag.destroy({ where: { id: productTagsToRemove } }),
+        ProductTag.destroy({ where: { id: removedProductTags } }),
         ProductTag.bulkCreate(newProductTags),
       ]);
     })
     .then((updatedProductTags) => res.json(updatedProductTags))
     .catch((err) => {
-      // console.log(err);
       res.status(400).json(err);
     });
 });
 
 router.delete('/:id', (req, res) => {
   // delete one product by its `id` value
+  try {
+    const productdata = await Product.destroy(req.body, {
+      where: {
+        id: req.params.id
+      }
+    });
+    if (!productdata) {
+      res.status(404).json({ message: 'No product found with this ID!' });
+      return;
+    }
+    res.status(200).json(productdata);
+  } catch (err) {
+    res.status(400).json(err);
+  }
 });
 
 module.exports = router;
